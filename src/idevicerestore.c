@@ -1988,7 +1988,7 @@ const char* get_component_name(const char* filename) {
 	} else if (!strncmp(filename, "sep-firmware", 12)) {
 		return "RestoreSEP";
 	} else {
-		error("WARNING: Unhandled component '%s'", filename);
-		return NULL;
+		error("WARNING: Unhandled component '%s'\n", filename);
+		return filename;
 	}
 }
