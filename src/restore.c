@@ -1648,8 +1648,8 @@ int restore_send_baseband_data(restored_client_t restore, struct idevicerestore_
             return -1;
         }
     }else{
-        FILE *f1 = fopen(client->bbfwtmp,"r");
-        FILE *f2 = fopen(bbfwtmp,"w");
+        FILE *f1 = fopen(client->bbfwtmp,"rb");
+        FILE *f2 = fopen(bbfwtmp,"wb");
         size_t s;
         fseek(f1, 0, SEEK_END);
         s = ftell(f1);
