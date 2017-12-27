@@ -14,6 +14,8 @@ libtool
 ltmain.sh
 m4
 src/*.o
+src/*.la
+src/*.lo
 src/idevicerestore
 src/.libs
 src/.deps

@@ -35,6 +35,7 @@ AM_PROG_CC_C_O
 AC_PROG_LIBTOOL
 
 # Checks for libraries.
+AC_SEARCH_LIBS([pthread_create], [pthread])
 PKG_CHECK_MODULES(libirecovery, libirecovery >= $LIBIRECOVERY_VERSION)
 PKG_CHECK_MODULES(libimobiledevice, libimobiledevice-1.0 >= $LIBIMOBILEDEVICE_VERSION)
 PKG_CHECK_MODULES(libplist, libplist >= $LIBPLIST_VERSION)
