@@ -78,8 +78,21 @@ case $CFLAGS in
   *)
   ;;
 esac
-
 AM_CONDITIONAL(NOMAIN, test x$nomain == xtrue)
+
+AC_MSG_CHECKING([whether to enable WIN32 specific flags])
+case "$host_os" in
+*mingw*)
+        win32=true
+        AC_MSG_RESULT([yes])
+	AC_CHECK_TOOL(WINDRES, windres)
+  ;;
+*)
+        win32=false
+        AC_MSG_RESULT([no])
+  ;;
+esac
+AM_CONDITIONAL(WIN32, test x$win32 = xtrue)
 
 # check for large file support
 AC_SYS_LARGEFILE
