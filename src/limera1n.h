@@ -19,11 +19,11 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
-#ifndef __LIMERA1N_H
-#define __LIMERA1N_H
+#ifndef LIMERA1N_H
+#define LIMERA1N_H
 #include <libirecovery.h>
 
 int limera1n_is_supported(struct irecv_device *device);
 int limera1n_exploit(struct irecv_device *device, irecv_client_t *client);
 
-#endif /* __LIMERA1N_H */
+#endif /* LIMERA1N_H */
