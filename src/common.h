@@ -145,8 +145,6 @@ char *generate_guid(void);
 
 int mkdir_with_parents(const char *dir, int mode);
 
-char *get_temp_filename(const char *prefix);
-
 void idevicerestore_progress(struct idevicerestore_client_t* client, int step, double progress);
 
 #ifndef HAVE_STRSEP
