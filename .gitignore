@@ -16,11 +16,7 @@ swig/*
 *.patch
 *.diff
 aclocal.m4
-config.h
-config.log
-config.sub
-config.guess
-config.status
+config.*
 configure
 depcomp
 install-sh
@@ -33,5 +29,7 @@ libtool
 *Makefile
 py-compile
 stamp-h1
+src/.DS_Store
 src/.libs
 src/idevicerestore
+.DS_Store

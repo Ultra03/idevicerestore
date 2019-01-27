@@ -13,21 +13,6 @@ AC_CONFIG_SRCDIR([src/])
 AC_CONFIG_HEADERS([config.h])
 AC_CONFIG_MACRO_DIR([m4])
 
-# Minimum package versions
-LIBIRECOVERY_VERSION=0.2.0
-LIBIMOBILEDEVICE_VERSION=1.1.6
-LIBPLIST_VERSION=1.12
-LIBZIP_VERSION=0.8
-LIBCURL_VERSION=7.0
-OPENSSL_VERSION=0.9.8
-
-AC_SUBST(LIBIRECOVERY_VERSION)
-AC_SUBST(LIBIMOBILEDEVICE_VERSION)
-AC_SUBST(LIBPLIST_VERSION)
-AC_SUBST(LIBZIP_VERSION)
-AC_SUBST(LIBCURL_VERSION)
-AC_SUBST(OPENSSL_VERSION)
-
 # Checks for programs.
 AC_PROG_CC
 AM_PROG_CC_C_O
@@ -35,13 +20,14 @@ AC_PROG_LIBTOOL
 
 # Checks for libraries.
 AC_SEARCH_LIBS([pthread_create], [pthread])
-PKG_CHECK_MODULES(libirecovery, libirecovery >= $LIBIRECOVERY_VERSION)
-PKG_CHECK_MODULES(libimobiledevice, libimobiledevice-1.0 >= $LIBIMOBILEDEVICE_VERSION)
-PKG_CHECK_MODULES(libplist, libplist >= $LIBPLIST_VERSION)
-PKG_CHECK_MODULES(libzip, libzip >= $LIBZIP_VERSION)
-PKG_CHECK_MODULES(libcurl, libcurl >= $LIBCURL_VERSION)
-PKG_CHECK_MODULES(openssl, openssl >= $OPENSSL_VERSION)
-PKG_CHECK_MODULES(zlib, zlib)
+PKG_CHECK_MODULES(libirecovery, libirecovery >= 0.2.0)
+PKG_CHECK_MODULES(libimobiledevice, libimobiledevice-1.0 >= 1.2.1)
+PKG_CHECK_MODULES(libplist, libplist >= 1.0)
+PKG_CHECK_MODULES(libzip, libzip >= 1.4)
+PKG_CHECK_MODULES(libusbmuxd, libusbmuxd >= 1.0)
+PKG_CHECK_MODULES(libcurl, libcurl >= 7.0)
+PKG_CHECK_MODULES(openssl, openssl >= 0.9.8)
+PKG_CHECK_MODULES(zlib, zlib >= 1.2)
 
 GLOBAL_CFLAGS=""
 AC_LDADD=""
@@ -50,6 +36,7 @@ case "$host_os" in
 	darwin*)
 	;;
 	linux*)
+		GLOBAL_CFLAGS+="-lpthread"
 	;;
 	mingw*)
 		GLOBAL_CFLAGS+="-DWIN32 -D__LITTLE_ENDIAN__=1"
