@@ -34,7 +34,6 @@
 #include <plist/plist.h>
 #include <zlib.h>
 #include <libgen.h>
-
 #include <curl/curl.h>
 
 #include "dfu.h"
@@ -48,70 +47,67 @@
 #include "download.h"
 #include "recovery.h"
 #include "idevicerestore.h"
-
 #include "limera1n.h"
-
 #include "locking.h"
 
 #define VERSION_XML "version.xml"
 
 #ifndef IDEVICERESTORE_NOMAIN
 static struct option longopts[] = {
-	{ "ecid",    required_argument, NULL, 'i' },
-	{ "udid",    required_argument, NULL, 'u' },
-	{ "debug",   no_argument,       NULL, 'd' },
-	{ "help",    no_argument,       NULL, 'h' },
-	{ "erase",   no_argument,       NULL, 'e' },
-	{ "custom",  no_argument,       NULL, 'c' },
-	{ "latest",  no_argument,       NULL, 'l' },
-	{ "cydia",   no_argument,       NULL, 's' },
-	{ "exclude", no_argument,       NULL, 'x' },
-	{ "shsh",    no_argument,       NULL, 't' },
-	{ "keep-pers", no_argument,     NULL, 'k' },
-	{ "pwn",     no_argument,       NULL, 'p' },
-	{ "no-action", no_argument,     NULL, 'n' },
-    { "downgrade", no_argument,     NULL, 'w' },
-    { "cache-path", required_argument, NULL, 'C' },
-    { "otamanifest", required_argument, NULL, 'o' },
-    { "boot", no_argument, NULL, 'b' },
-    { "paniclog", no_argument, NULL, 'g' },
-    { "nobootx", no_argument, NULL, 'b' },
+	{ "ecid",           required_argument, NULL, 'i' },
+	{ "udid",           required_argument, NULL, 'u' },
+	{ "debug",          no_argument,       NULL, 'd' },
+	{ "help",           no_argument,       NULL, 'h' },
+	{ "erase",          no_argument,       NULL, 'e' },
+	{ "custom",         no_argument,       NULL, 'c' },
+	{ "latest",         no_argument,       NULL, 'l' },
+	{ "cydia",          no_argument,       NULL, 's' },
+	{ "exclude",        no_argument,       NULL, 'x' },
+	{ "shsh",           no_argument,       NULL, 't' },
+	{ "keep-pers",      no_argument,       NULL, 'k' },
+	{ "pwn",            no_argument,       NULL, 'p' },
+	{ "no-action",      no_argument,       NULL, 'n' },
+    { "downgrade",      no_argument,       NULL, 'w' },
+    { "cache-path",     required_argument, NULL, 'C' },
+    { "otamanifest",    required_argument, NULL, 'o' },
+    { "boot",           no_argument,       NULL, 'b' },
+    { "paniclog",       no_argument,       NULL, 'g' },
+    { "nobootx",        no_argument,       NULL, 'b' },
 	{ NULL, 0, NULL, 0 }
 };
 
 void usage(int argc, char* argv[]) {
 	char* name = strrchr(argv[0], '/');
 	printf("Usage: %s [OPTIONS] FILE\n", (name ? name + 1 : argv[0]));
-	printf("Restore IPSW firmware FILE to an iOS device.\n\n");
+	printf("Restore iPSW firmware FILE to an iOS device.\n\n");
+    printf("  -h, --help\t\tprints usage information\n");
 	printf("  -i, --ecid ECID\ttarget specific device by its ECID\n");
 	printf("                 \te.g. 0xaabb123456 (hex) or 1234567890 (decimal)\n");
 	printf("  -u, --udid UDID\ttarget specific device by its device UDID\n");
 	printf("                 \tNOTE: only works with devices in normal mode.\n");
-	printf("  -d, --debug\t\tenable communication debugging\n");
-	printf("  -h, --help\t\tprints usage information\n");
+    printf("  -d, --debug\t\tenable communication debugging\n");
 	printf("  -e, --erase\t\tperform a full restore, erasing all data (defaults to update)\n");
-	printf("  -c, --custom\t\trestore with a custom firmware\n");
+	printf("  -c, --custom\t\trestore with a custom firmware (limera1n devices only)\n");
 	printf("  -l, --latest\t\tuse latest available firmware (with download on demand)\n");
 	printf("              \t\tDO NOT USE if you need to preserve the baseband (unlock)!\n");
 	printf("              \t\tUSE WITH CARE if you want to keep a jailbreakable firmware!\n");
 	printf("              \t\tThe FILE argument is ignored when using this option.\n");
-	printf("  -s, --cydia\t\tuse Cydia's signature service instead of Apple's\n");
-	printf("  -x, --exclude\t\texclude nor/baseband upgrade\n");
-	printf("  -t, --shsh\t\tfetch TSS record and save to .shsh file, then exit\n");
+	printf("  -s, --cydia\t\tuse Cydia's TSS service instead of Apple's\n");
+    printf("             \t\tOnly works for 32-bit devices\n");
+	printf("  -x, --exclude\t\texclude NOR/baseband upgrade\n");
+	printf("  -t, --shsh\t\tfetch signing tickets and save to .shsh file, then exit\n");
 	printf("  -k, --keep-pers\twrite personalized components to files for debugging\n");
 	printf("  -p, --pwn\t\tput device in pwned DFU mode and exit (limera1n devices only)\n");
-	printf("  -n, --no-action\tDo not perform any restore action. If combined with -l option\n");
-	printf("                 \tthe on demand ipsw download is performed before exiting.\n");
-	printf("  -w, --downgrade\tdowngrade with a custom firmware\n");
-	printf("  -C, --cache-path DIR\tUse specified directory for caching extracted\n");
-    printf("                      \tor other reused files.\n");
-    printf("  -o, --otamanifest BuildManifest.plist\tspecify ota BuildManifest to\n");
-    printf("                 \tsign bootfiles with a different apticket\n");
-    printf("  -b, --boot\t\tjust boot tethered\n");
+    printf("           \t\tNOT compatible with virtual machines!");
+	printf("  -n, --no-action\tDo not perform any restore action. If combined with -l option the on demand ipsw download is performed before exiting.\n");
+	printf("  -w, --downgrade\tdowngrade with a custom firmware (kDFU method, only for 32-bit devices!)\n");
+	printf("  -C, --cache-path DIR\tUse specified directory for caching extracted or other reused files.\n");
+    printf("  -o, --otamanifest BuildManifest.plist\tspecify OTA BuildManifest to sign bootfiles with a different ApTicket\n");
+    printf("  -b, --boot\t\tjust boot tethered (limera1n devices only)\n");
     printf("      --nobootx\t\tdoes not run \"bootx\" command\n");
-    printf("  -g, --paniclog\tboot restore ramdisk, print paniclog (if available) and reboot\n");
-	printf("\n");
-    printf("Homepage: <" PACKAGE_URL ">\n");
+    printf("  -g, --paniclog\tboot restore ramdisk, print paniclog (if available) and reboot\n\n");
+    printf("Homepage: https://github.com/s0uthwest/idevicerestore\n");
+    printf("Original project: https://github.com/s0uthwest/idevicerestore\n");
 }
 #endif
 
@@ -854,7 +850,7 @@ int idevicerestore_start(struct idevicerestore_client_t* client)
 		recovery_client_free(client);
 
 		/* this must be long enough to allow the device to run the iBEC */
-		/* FIXME: Probably better to detect if the device is back then */
+        /* FIXME: Probably better to detect if the device is back then */
 		sleep(7);
 	}
 	idevicerestore_progress(client, RESTORE_STEP_PREPARE, 0.5);
