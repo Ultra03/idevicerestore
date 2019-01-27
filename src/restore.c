@@ -1647,17 +1647,32 @@ int restore_send_baseband_data(restored_client_t restore, struct idevicerestore_
 		return -1;
 	}
 
-	// extract baseband firmware to temp file
-	bbfwtmp = tempnam(NULL, client->udid);
-	if (!bbfwtmp) {
-		error("WARNING: Could not generate temporary filename, using bbfw.tmp\n");
-		bbfwtmp = strdup("bbfw.tmp");
-	}
-	if (ipsw_extract_to_file(client->ipsw, bbfwpath, bbfwtmp) != 0) {
-		error("ERROR: Unable to extract baseband firmware from ipsw\n");
-		plist_free(response);
-		return -1;
-	}
+    // extract baseband firmware to temp file
+    bbfwtmp = tempnam(NULL, client->udid);
+    if (!bbfwtmp) {
+        error("WARNING: Could not generate temporary filename, using bbfw.tmp\n");
+        bbfwtmp = strdup("bbfw.tmp");
+    }
+    if (!client->bbfwtmp) {
+        if (ipsw_extract_to_file(client->ipsw, bbfwpath, bbfwtmp) != 0) {
+            error("ERROR: Unable to extract baseband firmware from ipsw\n");
+            plist_free(response);
+            return -1;
+        }
+    }else{
+        FILE *f1 = fopen(client->bbfwtmp,"rb");
+        FILE *f2 = fopen(bbfwtmp,"wb");
+        size_t s;
+        fseek(f1, 0, SEEK_END);
+        s = ftell(f1);
+        fseek(f1, 0, SEEK_SET);
+        
+        char * buf = malloc(s);
+        fread(buf, 1, s, f1);
+        fwrite(buf, 1, s, f2);
+        fclose(f1);
+        fclose(f2);
+    }
     
 	if (bb_nonce && !client->restore->bbtss) {
 		// keep the response for later requests
@@ -2407,33 +2422,21 @@ int restore_device(struct idevicerestore_client_t* client, plist_t build_identit
 
 	// FIXME: new on iOS 5 ?
 	plist_dict_set_item(opts, "BootImageType", plist_new_string("UserOrInternal"));
-	// FIXME: required?
-	//plist_dict_set_item(opts, "BootImageFile", plist_new_string("018-7923-347.dmg"));
 	plist_dict_set_item(opts, "CreateFilesystemPartitions", plist_new_bool(1));
 	plist_dict_set_item(opts, "DFUFileType", plist_new_string("RELEASE"));
 	plist_dict_set_item(opts, "DataImage", plist_new_bool(0));
-	// FIXME: not required for iOS 5?
-	//plist_dict_set_item(opts, "DeviceTreeFile", plist_new_string("DeviceTree.k48ap.img3"));
 	plist_dict_set_item(opts, "FirmwareDirectory", plist_new_string("."));
 	// FIXME: usable if false? (-x parameter)
 	plist_dict_set_item(opts, "FlashNOR", plist_new_bool(1));
-	// FIXME: not required for iOS 5?
-	//plist_dict_set_item(opts, "KernelCacheFile", plist_new_string("kernelcache.release.k48"));
 	// FIXME: new on iOS 5 ?
 	plist_dict_set_item(opts, "KernelCacheType", plist_new_string("Release"));
-	// FIXME: not required for iOS 5?
-	//plist_dict_set_item(opts, "NORImagePath", plist_new_string("."));
 	// FIXME: new on iOS 5 ?
 	plist_dict_set_item(opts, "NORImageType", plist_new_string("production"));
-	// FIXME: not required for iOS 5?
-	//plist_dict_set_item(opts, "PersonalizedRestoreBundlePath", plist_new_string("/tmp/Per2.tmp"));
 	if (client->restore_boot_args) {
 		plist_dict_set_item(opts, "RestoreBootArgs", plist_new_string(client->restore_boot_args));
 	}
 	plist_dict_set_item(opts, "RestoreBundlePath", plist_new_string("/tmp/Per2.tmp"));
 	plist_dict_set_item(opts, "RootToInstall", plist_new_bool(0));
-	// FIXME: not required for iOS 5?
-	//plist_dict_set_item(opts, "SourceRestoreBundlePath", plist_new_string("/tmp"));
 	plist_dict_set_item(opts, "SystemImage", plist_new_bool(1));
 	// FIXME: new on iOS 5 ?
 	plist_dict_set_item(opts, "SystemImageType", plist_new_string("User"));
@@ -2469,9 +2472,6 @@ int restore_device(struct idevicerestore_client_t* client, plist_t build_identit
 			sval = NULL;
 		}
 	}
-
-	// FIXME: not required for iOS 5?
-	//plist_dict_set_item(opts, "UserLocale", plist_new_string("en_US"));
 
 	/* this is mandatory on iOS 7+ to allow restore from normal mode */
 	plist_dict_set_item(opts, "PersonalizedDuringPreflight", plist_new_bool(1));
