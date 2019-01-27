@@ -131,6 +131,7 @@ char *generate_guid(void);
 
 #ifdef WIN32
 #include <windows.h>
+#include <unistd.h>
 #define __mkdir(path, mode) mkdir(path)
 #define FMT_qu "%I64u"
 #ifndef sleep
@@ -143,6 +144,8 @@ char *generate_guid(void);
 #endif
 
 int mkdir_with_parents(const char *dir, int mode);
+
+char *get_temp_filename(const char *prefix);
 
 void idevicerestore_progress(struct idevicerestore_client_t* client, int step, double progress);
 

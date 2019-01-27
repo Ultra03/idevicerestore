@@ -13,7 +13,6 @@ AC_CONFIG_SRCDIR([src/])
 AC_CONFIG_HEADERS([config.h])
 AC_CONFIG_MACRO_DIR([m4])
 
-
 # Minimum package versions
 LIBIRECOVERY_VERSION=0.2.0
 LIBIMOBILEDEVICE_VERSION=1.1.6
@@ -42,6 +41,7 @@ PKG_CHECK_MODULES(libplist, libplist >= $LIBPLIST_VERSION)
 PKG_CHECK_MODULES(libzip, libzip >= $LIBZIP_VERSION)
 PKG_CHECK_MODULES(libcurl, libcurl >= $LIBCURL_VERSION)
 PKG_CHECK_MODULES(openssl, openssl >= $OPENSSL_VERSION)
+PKG_CHECK_MODULES(zlib, zlib)
 
 GLOBAL_CFLAGS=""
 AC_LDADD=""
@@ -53,14 +53,13 @@ case "$host_os" in
 	;;
 	mingw*)
 		GLOBAL_CFLAGS+="-DWIN32 -D__LITTLE_ENDIAN__=1"
-		AC_LDFLAGS+="-static-libgcc"
-		AC_LDADD="-lsetupapi"
+		AC_LDFLAGS+="-static-libgcc -lmsvcr100"
 	;;
 	*)
 	;;
 esac
 
-AC_CHECK_FUNCS([strsep strcspn])
+AC_CHECK_FUNCS([strsep strcspn mkstemp])
 if test x$ac_cv_func_strsep != xyes; then
   if test x$ac_cv_func_strcspn != xyes; then
     AC_MSG_ERROR([You need either strsep or strcspn to build $PACKAGE])

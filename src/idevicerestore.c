@@ -83,9 +83,9 @@ void usage(int argc, char* argv[]) {
 	char* name = strrchr(argv[0], '/');
 	printf("Usage: %s [OPTIONS] FILE\n", (name ? name + 1 : argv[0]));
 	printf("Restore IPSW firmware FILE to an iOS device.\n\n");
-	printf("  -i, --ecid ECID\ttarget specific device by its hexadecimal ECID\n");
-	printf("                 \te.g. 0xaabb123456 or 00000012AABBCCDD\n");
-	printf("  -u, --udid UDID\ttarget specific device by its 40-digit device UDID\n");
+	printf("  -i, --ecid ECID\ttarget specific device by its ECID\n");
+	printf("                 \te.g. 0xaabb123456 (hex) or 1234567890 (decimal)\n");
+	printf("  -u, --udid UDID\ttarget specific device by its device UDID\n");
 	printf("                 \tNOTE: only works with devices in normal mode.\n");
 	printf("  -d, --debug\t\tenable communication debugging\n");
 	printf("  -h, --help\t\tprints usage information\n");
@@ -655,12 +655,12 @@ int idevicerestore_start(struct idevicerestore_client_t* client)
 		lock_file(lockfn, &li);
 		FILE* extf = NULL;
 		if (access(extfn, F_OK) != 0) {
-			extf = fopen(extfn, "w");
+			extf = fopen(extfn, "wb");
 		}
 		unlock_file(&li);
 		if (!extf) {
 			// use temp filename
-			filesystem = tempnam(NULL, "ipsw_");
+			filesystem = get_temp_filename("ipsw_");
 			if (!filesystem) {
 				error("WARNING: Could not get temporary filename, using '%s' in current directory\n", fsname);
 				filesystem = strdup(fsname);
@@ -1129,7 +1129,7 @@ int main(int argc, char* argv[]) {
 		case 'i':
 			if (optarg) {
 				char* tail = NULL;
-				client->ecid = strtoull(optarg, &tail, 16);
+				client->ecid = strtoull(optarg, &tail, 0);
 				if (tail && (tail[0] != '\0')) {
 					client->ecid = 0;
 				}
@@ -1960,6 +1960,8 @@ const char* get_component_name(const char* filename) {
 		return "AppleLogo";
 	} else if (!strncmp(filename, "liquiddetect", 12)) {
 		return "Liquid";
+	} else if (!strncmp(filename, "lowpowermode", 12)) {
+		return "LowPowerWallet0";
 	} else if (!strncmp(filename, "recoverymode", 12)) {
 		return "RecoveryMode";
 	} else if (!strncmp(filename, "batterylow0", 11)) {

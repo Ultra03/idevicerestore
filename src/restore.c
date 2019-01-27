@@ -155,7 +155,7 @@ static int restore_idevice_new(struct idevicerestore_client_t* client, idevice_t
 		}
 
 		if (restored_client_new(dev, &restore, "idevicerestore") != RESTORE_E_SUCCESS) {
-			error("ERROR: %s: can't connect to restored on device with UDID %s", __func__, devices[j]);
+			error("ERROR: %s: can't connect to restored on device with UDID %s\n", __func__, devices[j]);
 			continue;
 
 		}
@@ -903,7 +903,6 @@ int restore_send_nor(restored_client_t restore, struct idevicerestore_client_t* 
 	unsigned int llb_size = 0;
 	unsigned char* llb_data = NULL;
 	plist_t dict = NULL;
-	char* filename = NULL;
 	unsigned int nor_size = 0;
 	unsigned char* nor_data = NULL;
 	plist_t norimage_array = NULL;
@@ -938,16 +937,19 @@ int restore_send_nor(restored_client_t restore, struct idevicerestore_client_t* 
 	memset(manifest_file, '\0', sizeof(manifest_file));
 	snprintf(manifest_file, sizeof(manifest_file), "%s/manifest", firmware_path);
 
-	firmware_files = plist_new_array();
+	firmware_files = plist_new_dict();
 	ipsw_extract_to_memory(client->ipsw, manifest_file, &manifest_data, &manifest_size);
 	if (manifest_data && manifest_size > 0) {
 		info("Getting firmware manifest from %s\n", manifest_file);
 		char *manifest_p = (char*)manifest_data;
+		char *filename = NULL;
 		while ((filename = strsep(&manifest_p, "\r\n")) != NULL) {
 			if (*filename == '\0') continue;
+			const char *compname = get_component_name(filename);
+			if (!compname) continue;
 			memset(firmware_filename, '\0', sizeof(firmware_filename));
 			snprintf(firmware_filename, sizeof(firmware_filename), "%s/%s", firmware_path, filename);
-			plist_array_append_item(firmware_files, plist_new_string(firmware_filename));
+			plist_dict_set_item(firmware_files, compname, plist_new_string(firmware_filename));
 		}
 		free(manifest_data);
 	} else {
@@ -958,7 +960,7 @@ int restore_send_nor(restored_client_t restore, struct idevicerestore_client_t* 
 			plist_dict_new_iter(build_id_manifest, &iter);
 		}
 		if (iter) {
-			char *component;
+			char *component = NULL;
 			plist_t manifest_entry;
 			do {
 				component = NULL;
@@ -973,16 +975,17 @@ int restore_send_nor(restored_client_t restore, struct idevicerestore_client_t* 
 					if (is_fw) {
 						plist_t comp_path = plist_access_path(manifest_entry, 2, "Info", "Path");
 						if (comp_path) {
-							plist_array_append_item(firmware_files, plist_copy(comp_path));
+							plist_dict_set_item(firmware_files, component, plist_copy(comp_path));
 						}
 					}
 				}
+				free(component);
 			} while (manifest_entry);
 			free(iter);
 		}
 	}
 
-	if (plist_array_get_size(firmware_files) == 0) {
+	if (plist_dict_get_size(firmware_files) == 0) {
 		error("ERROR: Unable to get list of firmware files.\n");
 		return -1;
 	}
@@ -1012,24 +1015,27 @@ int restore_send_nor(restored_client_t restore, struct idevicerestore_client_t* 
 
 	norimage_array = plist_new_array();
 
-	for (i = 0; i < plist_array_get_size(firmware_files); i++) {
-		plist_t pcomp = plist_array_get_item(firmware_files, i);
+	plist_dict_iter iter = NULL;
+	plist_dict_new_iter(firmware_files, &iter);
+	while (iter) {
+		char *comp = NULL;
+		plist_t pcomp = NULL;
+		plist_dict_next_item(firmware_files, iter, &comp, &pcomp);
+		if (!comp) {
+			break;
+		}
 		char *comppath = NULL;
-
 		plist_get_string_val(pcomp, &comppath);
-		if (!comppath) continue;
-
-		filename = strrchr(comppath, '/');
-		if (!filename) {
-			free(comppath);
+		if (!comppath) {
+			free(comp);
 			continue;
 		}
-		filename++;
 
-		component = get_component_name(filename);
+		component = (const char*)comp;
 		if (!strcmp(component, "LLB") || !strcmp(component, "RestoreSEP")) {
 			// skip LLB, it's already passed in LlbImageData
 			// skip RestoreSEP, it's passed in RestoreSEPImageData
+			free(comp);
 			free(comppath);
 			continue;
 		}
@@ -1038,6 +1044,8 @@ int restore_send_nor(restored_client_t restore, struct idevicerestore_client_t* 
 		unsigned int component_size = 0;
 
 		if (extract_component(client->ipsw, comppath, &component_data, &component_size) < 0) {
+			free(iter);
+			free(comp);
 			free(comppath);
 			plist_free(firmware_files);
 			error("ERROR: Unable to extract component: %s\n", component);
@@ -1045,6 +1053,8 @@ int restore_send_nor(restored_client_t restore, struct idevicerestore_client_t* 
 		}
 
 		if (personalize_component(component, component_data, component_size, client->tss, &nor_data, &nor_size) < 0) {
+			free(iter);
+			free(comp);
 			free(comppath);
 			free(component_data);
 			plist_free(firmware_files);
@@ -1056,17 +1066,19 @@ int restore_send_nor(restored_client_t restore, struct idevicerestore_client_t* 
 		component_size = 0;
 
 		/* make sure iBoot is the first entry in the array */
-		if (!strncmp("iBoot", filename, 5)) {
+		if (!strncmp("iBoot", component, 5)) {
 			plist_array_insert_item(norimage_array, plist_new_data((char*)nor_data, (uint64_t)nor_size), 0);
 		} else {
 			plist_array_append_item(norimage_array, plist_new_data((char*)nor_data, (uint64_t)nor_size));
 		}
 
+		free(comp);
 		free(comppath);
 		free(nor_data);
 		nor_data = NULL;
 		nor_size = 0;
 	}
+	free(iter);
 	plist_free(firmware_files);
 	plist_dict_set_item(dict, "NorImageData", norimage_array);
 
@@ -1635,33 +1647,21 @@ int restore_send_baseband_data(restored_client_t restore, struct idevicerestore_
 		return -1;
 	}
 
-    // extract baseband firmware to temp file
-    bbfwtmp = tempnam(NULL, client->udid);
-    if (!bbfwtmp) {
-        error("WARNING: Could not generate temporary filename, using bbfw.tmp\n");
-        bbfwtmp = strdup("bbfw.tmp");
-    }
-    if (!client->bbfwtmp) {
-        if (ipsw_extract_to_file(client->ipsw, bbfwpath, bbfwtmp) != 0) {
-            error("ERROR: Unable to extract baseband firmware from ipsw\n");
-            plist_free(response);
-            return -1;
-        }
-    }else{
-        FILE *f1 = fopen(client->bbfwtmp,"rb");
-        FILE *f2 = fopen(bbfwtmp,"wb");
-        size_t s;
-        fseek(f1, 0, SEEK_END);
-        s = ftell(f1);
-        fseek(f1, 0, SEEK_SET);
-        
-        char * buf = malloc(s);
-        fread(buf, 1, s, f1);
-        fwrite(buf, 1, s, f2);
-        fclose(f1);
-        fclose(f2);
-    }
-
+	// extract baseband firmware to temp file
+	bbfwtmp = get_temp_filename("bbfw_");
+	if (!bbfwtmp) {
+		size_t l = strlen(client->udid);
+		bbfwtmp = malloc(l + 10);
+		strcpy(bbfwtmp, "bbfw_");
+		strncpy(bbfwtmp + 5, client->udid, l);
+		strcpy(bbfwtmp + 5 + l, ".tmp");
+		error("WARNING: Could not generate temporary filename, using %s in current directory\n", bbfwtmp);
+	}
+	if (ipsw_extract_to_file(client->ipsw, bbfwpath, bbfwtmp) != 0) {
+		error("ERROR: Unable to extract baseband firmware from ipsw\n");
+		goto leave;
+	}
+    
 	if (bb_nonce && !client->restore->bbtss) {
 		// keep the response for later requests
 		client->restore->bbtss = response;
@@ -1821,19 +1821,30 @@ plist_t restore_get_se_firmware_data(restored_client_t restore, struct idevicere
 	char *comp_path = NULL;
 	unsigned char* component_data = NULL;
 	unsigned int component_size = 0;
-	plist_t fwdict = NULL;
 	plist_t parameters = NULL;
 	plist_t request = NULL;
 	plist_t response = NULL;
 	int ret;
-
-	if (build_identity_has_component(build_identity, "SE,Firmware")) {
+	uint64_t chip_id = 0;
+	plist_t node = plist_dict_get_item(p_info, "SE,ChipID");
+	if (node && plist_get_node_type(node) == PLIST_UINT) {
+		plist_get_uint_val(node, &chip_id);
+	}
+	if (chip_id == 0x20211) {
 		comp_name = "SE,Firmware";
-	} else if (build_identity_has_component(build_identity, "SE,UpdatePayload")) {
+	} else if (chip_id == 0x73 || chip_id == 0x64) {
 		comp_name = "SE,UpdatePayload";
 	} else {
-		error("ERROR: Neither 'SE,Firmware' nor 'SE,UpdatePayload' found in build identity.\n");
-		return NULL;
+		info("WARNING: Unknown SE,ChipID 0x%x detected. Restore might fail.\n", chip_id);
+		if (build_identity_has_component(build_identity, "SE,UpdatePayload"))
+			comp_name = "SE,UpdatePayload";
+		else if (build_identity_has_component(build_identity, "SE,Firmware"))
+			comp_name = "SE,Firmware";
+		else {
+			error("ERROR: Neither 'SE,Firmware' nor 'SE,UpdatePayload' found in build identity.\n");
+			return NULL;
+		}
+		debug("DEBUG: %s: using %s\n", __func__, comp_name);
 	}
 
 	if (build_identity_get_component_path(build_identity, comp_name, &comp_path) < 0) {
@@ -1895,48 +1906,21 @@ plist_t restore_get_se_firmware_data(restored_client_t restore, struct idevicere
 
 plist_t restore_get_savage_firmware_data(restored_client_t restore, struct idevicerestore_client_t* client, plist_t build_identity, plist_t p_info)
 {
-	const char *comp_name = NULL;
+	char *comp_name = NULL;
 	char *comp_path = NULL;
 	unsigned char* component_data = NULL;
 	unsigned int component_size = 0;
 	unsigned char* component_data_tmp = NULL;
-	plist_t fwdict = NULL;
 	plist_t parameters = NULL;
 	plist_t request = NULL;
 	plist_t response = NULL;
 	plist_t node = NULL;
-	uint8_t isprod = 0;
 	int ret;
-
-	node = plist_dict_get_item(p_info, "Savage,ProductionMode");
-	if (node && (plist_get_node_type(node) == PLIST_BOOLEAN)) {
-		plist_get_bool_val(node, &isprod);
-	}
-	node = NULL;
-	if (isprod) {
-		comp_name = "Savage,B2-Prod-Patch";
-	} else {
-		comp_name = "Savage,B2-Dev-Patch";
-	}
-
-	if (build_identity_get_component_path(build_identity, comp_name, &comp_path) < 0) {
-		error("ERROR: Unable get path for '%s' component\n", comp_name);
-		return NULL;
-	}
-
-	ret = extract_component(client->ipsw, comp_path, &component_data, &component_size);
-	free(comp_path);
-	comp_path = NULL;
-	if (ret < 0) {
-		error("ERROR: Unable to extract '%s' component\n", comp_name);
-		return NULL;
-	}
 
 	/* create Savage request */
 	request = tss_request_new(NULL);
 	if (request == NULL) {
 		error("ERROR: Unable to create Savage TSS request\n");
-		free(component_data);
 		return NULL;
 	}
 
@@ -1949,16 +1933,23 @@ plist_t restore_get_savage_firmware_data(restored_client_t restore, struct idevi
 	plist_dict_merge(&parameters, p_info);
 
 	/* add required tags for Savage TSS request */
-	tss_request_add_savage_tags(request, parameters, NULL);
+	tss_request_add_savage_tags(request, parameters, NULL, &comp_name);
 
 	plist_free(parameters);
+
+	if (!comp_name) {
+		error("ERROR: Could not determine Savage firmware component\n");
+		plist_free(request);
+		return NULL;
+	}
+	debug("DEBUG: %s: using %s\n", __func__, comp_name);
 
 	info("Sending Savage TSS request...\n");
 	response = tss_request_send(request, client->tss_url);
 	plist_free(request);
 	if (response == NULL) {
 		error("ERROR: Unable to fetch Savage ticket\n");
-		free(component_data);
+		free(comp_name);
 		return NULL;
 	}
 
@@ -1967,6 +1958,24 @@ plist_t restore_get_savage_firmware_data(restored_client_t restore, struct idevi
 	} else {
 		error("ERROR: No 'Savage,Ticket' in TSS response, this might not work\n");
 	}
+
+	/* now get actual component data */
+	if (build_identity_get_component_path(build_identity, comp_name, &comp_path) < 0) {
+		error("ERROR: Unable get path for '%s' component\n", comp_name);
+		free(comp_name);
+		return NULL;
+	}
+
+	ret = extract_component(client->ipsw, comp_path, &component_data, &component_size);
+	free(comp_path);
+	comp_path = NULL;
+	if (ret < 0) {
+		error("ERROR: Unable to extract '%s' component\n", comp_name);
+		free(comp_name);
+		return NULL;
+	}
+	free(comp_name);
+	comp_name = NULL;
 
 	component_data_tmp = realloc(component_data, (size_t)component_size+16);
 	if (!component_data_tmp) {
@@ -1980,6 +1989,92 @@ plist_t restore_get_savage_firmware_data(restored_client_t restore, struct idevi
 	component_size += 16;
 
 	plist_dict_set_item(response, "FirmwareData", plist_new_data((char*)component_data, (uint64_t) component_size));
+	free(component_data);
+	component_data = NULL;
+	component_size = 0;
+
+	return response;
+}
+
+plist_t restore_get_yonkers_firmware_data(restored_client_t restore, struct idevicerestore_client_t* client, plist_t build_identity, plist_t p_info)
+{
+	char *comp_name = NULL;
+	char *comp_path = NULL;
+	plist_t comp_node = NULL;
+	unsigned char* component_data = NULL;
+	unsigned int component_size = 0;
+	plist_t parameters = NULL;
+	plist_t request = NULL;
+	plist_t response = NULL;
+	plist_t node = NULL;
+	int ret;
+
+	/* create Yonkers request */
+	request = tss_request_new(NULL);
+	if (request == NULL) {
+		error("ERROR: Unable to create Yonkers TSS request\n");
+		free(component_data);
+		free(comp_name);
+		return NULL;
+	}
+
+	parameters = plist_new_dict();
+
+	/* add manifest for current build_identity to parameters */
+	tss_parameters_add_from_manifest(parameters, build_identity);
+
+	/* add Yonkers,* tags from info dictionary to parameters */
+	plist_dict_merge(&parameters, p_info);
+
+	/* add required tags for Yonkers TSS request */
+	tss_request_add_yonkers_tags(request, parameters, NULL, &comp_name);
+
+	plist_free(parameters);
+
+	if (!comp_name) {
+		error("ERROR: Could not determine Yonkers firmware component\n");
+		plist_free(request);
+		return NULL;
+	}
+	debug("DEBUG: %s: using %s\n", __func__, comp_name);
+
+	info("Sending Yonkers TSS request...\n");
+	response = tss_request_send(request, client->tss_url);
+	plist_free(request);
+	if (response == NULL) {
+		error("ERROR: Unable to fetch Yonkers ticket\n");
+		free(component_data);
+		return NULL;
+	}
+
+	if (plist_dict_get_item(response, "Yonkers,Ticket")) {
+		info("Received Yonkers ticket\n");
+	} else {
+		error("ERROR: No 'Yonkers,Ticket' in TSS response, this might not work\n");
+	}
+
+	if (build_identity_get_component_path(build_identity, comp_name, &comp_path) < 0) {
+		error("ERROR: Unable get path for '%s' component\n", comp_name);
+		free(comp_name);
+		return NULL;
+	}
+
+	/* now get actual component data */
+	ret = extract_component(client->ipsw, comp_path, &component_data, &component_size);
+	free(comp_path);
+	comp_path = NULL;
+	if (ret < 0) {
+		error("ERROR: Unable to extract '%s' component\n", comp_name);
+		free(comp_name);
+		return NULL;
+	}
+	free(comp_name);
+	comp_name = NULL;
+
+	plist_t firmware_data = plist_new_dict();
+	plist_dict_set_item(firmware_data, "YonkersFirmware", plist_new_data((char *)component_data, (uint64_t)component_size));
+	plist_dict_set_item(response, "FirmwareData", firmware_data);
+
 	free(component_data);
 	component_data = NULL;
 	component_size = 0;
@@ -2050,9 +2145,16 @@ int restore_send_firmware_updater_data(restored_client_t restore, struct idevice
 			goto error_out;
 		}
 	} else if (strcmp(s_updater_name, "Savage") == 0) {
-		fwdict = restore_get_savage_firmware_data(restore, client, build_identity, p_info);
+		const char *fwtype = "Savage";
+		plist_t p_info2 = plist_dict_get_item(p_info, "YonkersDeviceInfo");
+		if (p_info2 && plist_get_node_type(p_info2) == PLIST_DICT) {
+			fwtype = "Yonkers";
+			fwdict = restore_get_yonkers_firmware_data(restore, client, build_identity, p_info2);
+		} else {
+			fwdict = restore_get_savage_firmware_data(restore, client, build_identity, p_info);
+		}
 		if (fwdict == NULL) {
-			error("ERROR: %s: Couldn't get Savage firmware data\n", __func__);
+			error("ERROR: %s: Couldn't get %s firmware data\n", __func__, fwtype);
 			goto error_out;
 		}
 	} else {
@@ -2184,7 +2286,7 @@ int restore_device(struct idevicerestore_client_t* client, plist_t build_identit
 	idevice_t device = NULL;
 	restored_client_t restore = NULL;
 	restored_error_t restore_error = RESTORE_E_SUCCESS;
-	thread_t fdr_thread = NULL;
+	thread_t fdr_thread = (thread_t)NULL;
 
 	restore_finished = 0;
 
@@ -2357,6 +2459,20 @@ int restore_device(struct idevicerestore_client_t* client, plist_t build_identit
 	}
 	// FIXME: does this have any effect actually?
 	plist_dict_set_item(opts, "UpdateBaseband", plist_new_bool(0));
+
+	plist_t sep = plist_access_path(build_identity, 3, "Manifest", "SEP", "Info");
+	if (sep) {
+		node = plist_dict_get_item(sep, "RequiredCapacity");
+		if (node && plist_get_node_type(node) == PLIST_STRING) {
+			char* sval = NULL;
+			plist_get_string_val(node, &sval);
+			debug("TZ0RequiredCapacity: %s\n", sval);
+			plist_dict_set_item(opts, "TZ0RequiredCapacity", plist_copy(node));
+			free(sval);
+			sval = NULL;
+		}
+	}
+
 	// FIXME: not required for iOS 5?
 	//plist_dict_set_item(opts, "UserLocale", plist_new_string("en_US"));
 
@@ -2426,6 +2542,10 @@ int restore_device(struct idevicerestore_client_t* client, plist_t build_identit
 		else if (!strcmp(type, "StatusMsg")) {
 			err = restore_handle_status_msg(restore, message);
 			if (restore_finished) {
+				plist_t dict = plist_new_dict();
+				plist_dict_set_item(dict, "MsgType", plist_new_string("ReceivedFinalStatusMsg"));
+				restored_send(restore, dict);
+				plist_free(dict);
 				client->flags |= FLAG_QUIT;
 			}
 		}
