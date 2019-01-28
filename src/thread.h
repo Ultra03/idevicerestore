@@ -19,8 +19,8 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
-#ifndef __THREAD_H
-#define __THREAD_H
+#ifndef THREAD_H
+#define THREAD_H
 
 #ifdef WIN32
 #include <windows.h>
@@ -56,4 +56,4 @@ void mutex_unlock(mutex_t* mutex);
 
 void thread_once(thread_once_t *once_control, void (*init_routine)(void));
 
-#endif
+#endif /* thread_h */

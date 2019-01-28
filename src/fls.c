@@ -18,6 +18,7 @@
  * License along with this library; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -335,4 +336,3 @@ int fls_insert_ticket(fls_file* fls, const unsigned char* data, unsigned int siz
 
 	return 0;
 }
-

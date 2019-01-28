@@ -33,6 +33,20 @@
 #include "common.h"
 #include "idevicerestore.h"
 
+#include "tss.h"
+#ifdef WIN32
+#include <windows.h>
+#define __mkdir(path, mode) mkdir(path)
+#define FMT_qu "%I64u"
+#ifndef sleep
+#define sleep(x) Sleep(x*1000)
+#endif
+#else
+#include <sys/stat.h>
+#define __mkdir(path, mode) mkdir(path, mode)
+#define FMT_qu "%qu"
+#endif
+
 #define TSS_CLIENT_VERSION_STRING "libauthinstall-293.1.16"
 #define ECID_STRSIZE 0x20
 
