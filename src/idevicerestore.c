@@ -93,7 +93,7 @@ void usage(int argc, char* argv[]) {
 	printf("              \t\tUSE WITH CARE if you want to keep a jailbreakable firmware!\n");
 	printf("              \t\tThe FILE argument is ignored when using this option.\n");
 	printf("  -s, --cydia\t\tuse Cydia's TSS service instead of Apple's\n");
-    printf("             \t\tOnly works for 32-bit devices\n");
+    printf("             \t\tOnly works for 32-bit devices!\n");
 	printf("  -x, --exclude\t\texclude NOR/baseband upgrade\n");
 	printf("  -t, --shsh\t\tfetch signing tickets and save to .shsh file, then exit\n");
 	printf("  -k, --keep-pers\twrite personalized components to files for debugging\n");
@@ -313,7 +313,7 @@ int idevicerestore_start(struct idevicerestore_client_t* client)
 			return -1;
 		}
 		info("exploiting with limera1n...\n");
-		// TODO: check for non-limera1n device and fail
+		// TO-DO: check for non-limera1n device and fail
 		if (limera1n_exploit(client->device, &client->dfu->client) != 0) {
 			error("ERROR: limera1n exploit failed\n");
 			dfu_client_free(client);
@@ -690,7 +690,7 @@ int idevicerestore_start(struct idevicerestore_client_t* client)
 
 	idevicerestore_progress(client, RESTORE_STEP_PREPARE, 0.2);
 
-	/* retrieve shsh blobs if required */
+	/* retrieve signing tickets if required */
 	if (tss_enabled) {
 		debug("Getting device's ECID for TSS request\n");
 		/* fetch the device's ECID for the TSS request */
@@ -705,7 +705,7 @@ int idevicerestore_start(struct idevicerestore_client_t* client)
 			int nonce_size = 0;
 			if (get_ap_nonce(client, &nonce, &nonce_size) < 0) {
 				/* the first nonce request with older firmware releases can fail and it's OK */
-				info("NOTE: Unable to get nonce from device\n");
+				info("NOTE: Unable to get ApNonce from device\n");
 			}
 
 			if (!client->nonce || (nonce_size != client->nonce_size) || (memcmp(nonce, client->nonce, nonce_size) != 0)) {
@@ -720,7 +720,7 @@ int idevicerestore_start(struct idevicerestore_client_t* client)
 		}
 
 		if (get_tss_response(client, build_identity, &client->tss) < 0) {
-			error("ERROR: Unable to get SHSH blobs for this device\n");
+			error("ERROR: Unable to get signing tickets for this device\n");
 			return -1;
 		}
 	}
@@ -753,9 +753,9 @@ int idevicerestore_start(struct idevicerestore_client_t* client)
 					gzFile zf = gzopen(zfn, "wb");
 					gzwrite(zf, bin, blen);
 					gzclose(zf);
-					info("SHSH saved to '%s'\n", zfn);
+					info("Signing tickets saved to '%s'\n", zfn);
 				} else {
-					info("SHSH '%s' already present.\n", zfn);
+					info("Signing tickets '%s' already present.\n", zfn);
 				}
 				free(bin);
 			} else {
@@ -883,7 +883,7 @@ int idevicerestore_start(struct idevicerestore_client_t* client)
 			// Welcome iOS5. We have to re-request the TSS with our nonce.
 			plist_free(client->tss);
             if ((client->flags & FLAG_OTAMANIFEST ? get_tss_response(client, build_identity2, &client->tss) : get_tss_response(client, build_identity, &client->tss)) < 0) {
-                error("ERROR: Unable to get SHSH blobs for this device\n");
+                error("ERROR: Unable to get signing tickets for this device\n");
                 if (delete_fs && filesystem)
                     unlink(filesystem);
                 return -1;
@@ -1514,7 +1514,7 @@ int get_tss_response(struct idevicerestore_client_t* client, plist_t build_ident
 	*tss = NULL;
 
 	if ((client->build_major <= 8) || (client->flags & (FLAG_CUSTOM | FLAG_DOWNGRADE))) {
-		error("checking for local shsh\n");
+		error("checking for local signing tickets\n");
 
 		/* first check for local copy */
 		char zfn[1024];
@@ -1561,7 +1561,7 @@ int get_tss_response(struct idevicerestore_client_t* client, plist_t build_ident
 					free(bin);
 				}
 			} else {
-				error("no local file %s\n", zfn);
+				error("no local signing tickets file %s\n", zfn);
 			}
 		} else {
 			error("No version found?!\n");
@@ -1569,13 +1569,13 @@ int get_tss_response(struct idevicerestore_client_t* client, plist_t build_ident
 	}
 
 	if (*tss) {
-		info("Using cached SHSH\n");
+		info("Using cached signing tickets\n");
 		return 0;
 	} else if (client->flags & FLAG_DOWNGRADE) {
 		error("Refusing to proceed without saved ticket\n");
 		return -1;
 	} else {
-		info("Trying to fetch new SHSH blob\n");
+		info("Trying to fetch new signing tickets\n");
 	}
 
 	/* populate parameters */
@@ -1688,7 +1688,7 @@ int get_tss_response(struct idevicerestore_client_t* client, plist_t build_ident
 		return -1;
 	}
 
-	info("Received SHSH blobs\n");
+	info("Received signing tickets\n");
 
 	plist_free(request);
 	plist_free(parameters);
@@ -1774,7 +1774,7 @@ int personalize_component(const char *component_name, const unsigned char* compo
 	} else {
 		/* try to get blob for current component from tss response */
 		if (tss_response && tss_response_get_blob_by_entry(tss_response, component_name, &component_blob) < 0) {
-			debug("NOTE: No SHSH blob found for component %s\n", component_name);
+			debug("NOTE: No signing tickets found for component %s\n", component_name);
 		}
 
 		if (component_blob != NULL) {
