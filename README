@@ -3,16 +3,12 @@ About
 
 The idevicerestore tool allows to restore firmware files to iOS devices.
 
-It is a full reimplementation of all granular steps which are performed during
-restore of a firmware to a device.
+It is a full reimplementation of all granular steps which are performed during restore of a firmware to a device. 
 
-In general, upgrades and downgrades are possible, however subject to
-availability of SHSH blobs from Apple for signing the firmare files.
+In general, upgrades and downgrades are possible, however subject to availability of SHSH blobs from Apple for signing the firmware files. This version created for using Odysseus method for 32-bit devices. 
 
 To restore a device to some firmware, simply run the following:
-$ sudo idevicerestore -l
-
-This will download and restore a device to the latest firmware available.
+$ idevicerestore -w
 
 Requirements
 ============
@@ -23,10 +19,11 @@ Development Packages of:
 	libusbmuxd
 	libplist
 	libzip
+        zlib
+        curl
 	openssl
 
 Software:
-	usbmuxd
 	make
 	autoheader
 	automake
@@ -39,9 +36,7 @@ Installation
 ============
 
 To compile run:
-	./autogen.sh
-	make
-	sudo make install
+	./autogen.sh && make && sudo make install
 
 Who/What/Where?
 ===============
@@ -49,11 +44,14 @@ Who/What/Where?
 Home:
 	http://www.libimobiledevice.org/
 
-Code:
+Original code:
 	git clone http://git.libimobiledevice.org/idevicerestore.git
 
-Code (Mirror):
+Original code (mirror):
 	git clone https://github.com/libimobiledevice/idevicerestore.git
+
+This fork code:
+        git clone https://github.com/s0uthwest/idevicerestore.git
 
 Tickets:
 	http://github.com/libimobiledevice/idevicerestore/issues
@@ -68,8 +66,7 @@ Credits
 =======
 
 Apple, iPhone, iPod, and iPod Touch are trademarks of Apple Inc.
-idevicerestore is an independent software tool and has not been
-authorized, sponsored, or otherwise approved by Apple Inc.
+idevicerestore is an independent software tool and has not been authorized, sponsored, or otherwise approved by Apple Inc.
 
 README Updated on:
-	2015-10-06
+	2019-01-28
