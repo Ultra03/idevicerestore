@@ -114,9 +114,9 @@ static void usage(int argc, char* argv[], int err)
     "     --nobootx         Doesn't run \"bootx\" command\n" \
     " -g, --paniclog        Boot restore ramdisk, print paniclog (if available) and reboot\n" \
     " -y, --no-input        Non-interactive mode, do not ask for any input.\n" \
-    " -C, --cache-path DIR  Use specified directory for caching extracted or other reused files.\n" \
+    " -C, --cache-path DIR  Use specified directory for caching extracted or other reused files.\n\n" \
 	"Homepage: https://github.com/s0uthwest/idevicerestore\n" \
-    "Original project: https://github.com/s0uthwest/idevicerestore\n" \
+    "Original project: https://github.com/libimobiledevice/idevicerestore\n",
 	(name ? name + 1 : argv[0]));
 }
 #endif

@@ -124,7 +124,7 @@ static const unsigned char *asn1_find_element(unsigned int index, unsigned char 
 
 	// find the element we are searching
     int i = 0;
-    while (i <= index; i++) {
+    while (i <= index, i++) {
 		off += asn1_get_element(&data[off], &el_type, &el_size);
 		if (i == index)
 			break;
