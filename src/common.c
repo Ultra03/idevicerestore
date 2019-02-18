@@ -2,8 +2,8 @@
  * common.c
  * Misc functions used in idevicerestore
  *
+ * Copyright (c) 2012-2019 Nikias Bassen. All Rights Reserved.
  * Copyright (c) 2012 Martin Szulecki. All Rights Reserved.
- * Copyright (c) 2012 Nikias Bassen. All Rights Reserved.
  * Copyright (c) 2010 Joshua Hill. All Rights Reserved.
  *
  * This library is free software; you can redistribute it and/or
@@ -32,6 +32,24 @@
 #include <libgen.h>
 #include <time.h>
 #include <sys/stat.h>
+#include <fcntl.h>
+#include <ctype.h>
+
+#ifdef WIN32
+#include <windows.h>
+#include <conio.h>
+#ifndef _O_EXCL
+#define _O_EXCL  0x0400
+#endif
+#ifndef O_EXCL
+#define O_EXCL   _O_EXCL
+#endif
+#else
+#include <sys/time.h>
+#include <pthread.h>
+#include <termios.h>
+#include <unistd.h>
+#endif
 
 #include "common.h"
 
@@ -304,3 +322,63 @@ char* strsep(char** strp, const char* delim)
         return s;
 }
 #endif
+
+#ifndef HAVE_REALPATH
+char* realpath(const char *filename, char *resolved_name)
+{
+#ifdef WIN32
+	if (access(filename, F_OK) != 0) {
+		return NULL;
+	}
+	if (GetFullPathName(filename, MAX_PATH, resolved_name, NULL) == 0) {
+		return NULL;
+	}
+	return resolved_name;
+#else
+#error please provide a realpath implementation for this platform
+	return NULL;
+#endif
+}
+#endif
+
+#ifdef WIN32
+#define BS_CC '\b'
+#define my_getch getch
+#else
+#define BS_CC 0x7f
+static int my_getch(void)
+{
+	struct termios oldt, newt;
+	int ch;
+	tcgetattr(STDIN_FILENO, &oldt);
+	newt = oldt;
+	newt.c_lflag &= ~(ICANON | ECHO);
+	tcsetattr(STDIN_FILENO, TCSANOW, &newt);
+	ch = getchar();
+	tcsetattr(STDIN_FILENO, TCSANOW, &oldt);
+	return ch;
+}
+#endif
+
+void get_user_input(char *buf, int maxlen, int secure)
+{
+	int len = 0;
+	int c;
+
+	while ((c = my_getch())) {
+		if ((c == '\r') || (c == '\n')) {
+			break;
+		} else if (isprint(c)) {
+			if (len < maxlen-1)
+				buf[len++] = c;
+			fputc((secure) ? '*' : c, stdout);
+		} else if (c == BS_CC) {
+			if (len > 0) {
+				fputs("\b \b", stdout);
+				len--;
+			}
+		}
+	}
+	fputs("\n", stdout);
+	buf[len] = 0;
+}

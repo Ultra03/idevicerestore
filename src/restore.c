@@ -2,8 +2,8 @@
  * restore.c
  * Functions for handling idevices in restore mode
  *
+ * Copyright (c) 2012-2019 Nikias Bassen. All Rights Reserved.
  * Copyright (c) 2010-2013 Martin Szulecki. All Rights Reserved.
- * Copyright (c) 2012-2015 Nikias Bassen. All Rights Reserved.
  * Copyright (c) 2010 Joshua Hill. All Rights Reserved.
  *
  * This library is free software; you can redistribute it and/or
@@ -327,13 +327,13 @@ static int restore_is_current_device(struct idevicerestore_client_t* client, con
 
 	device_error = idevice_new(&device, udid);
 	if (device_error != IDEVICE_E_SUCCESS) {
-		error("ERROR: %s: can't open device with UDID %s", __func__, udid);
+		debug("%s: can't open device with UDID %s", __func__, udid);
 		return 0;
 	}
 
 	restore_error = restored_client_new(device, &restored, "idevicerestore");
 	if (restore_error != RESTORE_E_SUCCESS) {
-		error("ERROR: %s: can't connect to restored\n", __func__);
+		debug("%s: can't connect to restored\n", __func__);
 		idevice_free(device);
 		return 0;
 	}
@@ -938,7 +938,9 @@ int restore_send_nor(restored_client_t restore, struct idevicerestore_client_t* 
 	snprintf(manifest_file, sizeof(manifest_file), "%s/manifest", firmware_path);
 
 	firmware_files = plist_new_dict();
-	ipsw_extract_to_memory(client->ipsw, manifest_file, &manifest_data, &manifest_size);
+	if (ipsw_file_exists(client->ipsw, manifest_file)) {
+		ipsw_extract_to_memory(client->ipsw, manifest_file, &manifest_data, &manifest_size);
+	}
 	if (manifest_data && manifest_size > 0) {
 		info("Getting firmware manifest from %s\n", manifest_file);
 		char *manifest_p = (char*)manifest_data;
@@ -1214,7 +1216,7 @@ static int restore_sign_bbfw(const char* bbfwtmp, plist_t bbtss, const unsigned 
 	unsigned char* buffer = NULL;
 	unsigned char* blob = NULL;
 	unsigned char* fdata = NULL;
-	off_t fsize = 0;
+	uint64_t fsize = 0;
 	uint64_t blob_size = 0;
 	int zerr = 0;
 	int zindex = -1;

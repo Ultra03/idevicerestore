@@ -2,8 +2,8 @@
  * idevicerestore.c
  * Restore device firmware and filesystem
  *
+ * Copyright (c) 2012-2019 Nikias Bassen. All Rights Reserved.
  * Copyright (c) 2010-2015 Martin Szulecki. All Rights Reserved.
- * Copyright (c) 2012-2015 Nikias Bassen. All Rights Reserved.
  * Copyright (c) 2010 Joshua Hill. All Rights Reserved.
  *
  * This library is free software; you can redistribute it and/or
@@ -70,44 +70,54 @@ static struct option longopts[] = {
     { "downgrade",      no_argument,       NULL, 'w' },
     { "cache-path",     required_argument, NULL, 'C' },
     { "otamanifest",    required_argument, NULL, 'o' },
+    { "no-input",       no_argument,       NULL, 'y' },
     { "boot",           no_argument,       NULL, 'b' },
     { "paniclog",       no_argument,       NULL, 'g' },
     { "nobootx",        no_argument,       NULL, 'b' },
 	{ NULL, 0, NULL, 0 }
 };
 
-void usage(int argc, char* argv[]) {
+static void usage(int argc, char* argv[], int err)
+{
 	char* name = strrchr(argv[0], '/');
-	printf("Usage: %s [OPTIONS] FILE\n", (name ? name + 1 : argv[0]));
-	printf("Restore iPSW firmware FILE to an iOS device.\n\n");
-    printf("  -h, --help\t\tprints usage information\n");
-	printf("  -i, --ecid ECID\ttarget specific device by its ECID\n");
-	printf("                 \te.g. 0xaabb123456 (hex) or 1234567890 (decimal)\n");
-	printf("  -u, --udid UDID\ttarget specific device by its device UDID\n");
-	printf("                 \tNOTE: only works with devices in normal mode.\n");
-    printf("  -d, --debug\t\tenable communication debugging\n");
-	printf("  -e, --erase\t\tperform a full restore, erasing all data (defaults to update)\n");
-	printf("  -c, --custom\t\trestore with a custom firmware (limera1n devices only)\n");
-	printf("  -l, --latest\t\tuse latest available firmware (with download on demand)\n");
-	printf("              \t\tDO NOT USE if you need to preserve the baseband (unlock)!\n");
-	printf("              \t\tUSE WITH CARE if you want to keep a jailbreakable firmware!\n");
-	printf("              \t\tThe FILE argument is ignored when using this option.\n");
-	printf("  -s, --cydia\t\tuse Cydia's TSS service instead of Apple's\n");
-    printf("             \t\tOnly works for 32-bit devices!\n");
-	printf("  -x, --exclude\t\texclude NOR/baseband upgrade\n");
-	printf("  -t, --shsh\t\tfetch signing tickets and save to .shsh file, then exit\n");
-	printf("  -k, --keep-pers\twrite personalized components to files for debugging\n");
-	printf("  -p, --pwn\t\tput device in pwned DFU mode and exit (limera1n devices only)\n");
-    printf("           \t\tNOT compatible with virtual machines!");
-	printf("  -n, --no-action\tDo not perform any restore action. If combined with -l option the on demand ipsw download is performed before exiting.\n");
-	printf("  -w, --downgrade\tdowngrade with a custom firmware (kDFU method, only for 32-bit devices!)\n");
-	printf("  -C, --cache-path DIR\tUse specified directory for caching extracted or other reused files.\n");
-    printf("  -o, --otamanifest BuildManifest.plist\tspecify OTA BuildManifest to sign bootfiles with a different ApTicket\n");
-    printf("  -b, --boot\t\tjust boot tethered (limera1n devices only)\n");
-    printf("      --nobootx\t\tdoes not run \"bootx\" command\n");
-    printf("  -g, --paniclog\tboot restore ramdisk, print paniclog (if available) and reboot\n\n");
-    printf("Homepage: https://github.com/s0uthwest/idevicerestore\n");
-    printf("Original project: https://github.com/s0uthwest/idevicerestore\n");
+	fprintf((err) ? stderr : stdout,
+	"Usage: %s [OPTIONS] PATH\n" \
+	"Restore IPSW firmware at PATH to an iOS device.\n\n" \
+	"PATH can be a compressed .ipsw file or a directory containing all files extracted from an IPSW.\n\n" \
+	"Options:\n" \
+    " -h, --help            Prints this usage information\n\n" \
+	"Restore options:\n"
+    " -d, --debug           Enable communication debugging\n" \
+    " -l, --latest          Use latest available firmware (with download on demand).\n" \
+    "                       Before performing any action it'll interactively ask to select one of the currently signed firmware versions unless -y has been given too.\n" \
+    "                       The PATH argument is ignored when using this option.\n" \
+    "                       DO NOT USE if you need to preserve the baseband (unlock)!\n" \
+    "                       USE WITH CARE if you want to keep a jailbreakable firmware!\n" \
+    " -e, --erase           Perform a full restore, erasing all data (defaults to update)\n" \
+    "                       DO NOT USE if you want to preserve user data on the device!\n" \
+	" -c, --custom          Restore with a custom firmware\n" \
+	" -x, --exclude         Exclude NOR/baseband upgrade\n" \
+    " -w, --downgrade       Downgrade with a custom firmware (kDFU method, only for 32-bit devices!)\n" \
+    " -n, --no-action       Do not perform any restore action. If combined with -l option the on-demand ipsw download is performed before exiting.\n" \
+    " -o, --otamanifest     Specify OTA BuildManifest to sign bootfiles with a different ApTicket\n\n" \
+    "Other options:\n" \
+    " -i, --ecid ECID       Target specific device by its ECID\n" \
+    "                       e.g. 0xaabb123456 (hex) or 1234567890 (decimal)\n" \
+    " -u, --udid UDID       Target specific device by its device UDID\n" \
+    "                       NOTE: only works with devices in normal mode.\n" \
+    " -t, --shsh            Fetch signing tickets and save to .shsh file, then exit\n" \
+    " -s, --cydia           Use Cydia's signature service instead of Apple's\n" \
+    "                       Works only for 32-bit devices!\n" \
+    " -p, --pwn             Put device in pwned DFU mode and exit (limera1n devices only)\n" \
+    " -k, --keep-pers       Write personalized components to files for debugging\n" \
+    " -b, --boot            just boot tethered (limera1n devices only)\n" \
+    "     --nobootx         Doesn't run \"bootx\" command\n" \
+    " -g, --paniclog        Boot restore ramdisk, print paniclog (if available) and reboot\n" \
+    " -y, --no-input        Non-interactive mode, do not ask for any input.\n" \
+    " -C, --cache-path DIR  Use specified directory for caching extracted or other reused files.\n" \
+	"Homepage: https://github.com/s0uthwest/idevicerestore\n" \
+    "Original project: https://github.com/s0uthwest/idevicerestore\n" \
+	(name ? name + 1 : argv[0]));
 }
 #endif
 
@@ -326,10 +336,96 @@ int idevicerestore_start(struct idevicerestore_client_t* client)
 	}
 
 	if (client->flags & FLAG_LATEST) {
-		// update version data (from cache, or apple if too old)
-		load_version_data(client);
+		char *fwurl = NULL;
+		unsigned char fwsha1[20];
+		unsigned char *p_fwsha1 = NULL;
+		plist_t signed_fws = NULL;
+		int res = ipsw_get_signed_firmwares(client->device->product_type, &signed_fws);
+		if (res < 0) {
+			error("ERROR: Could not fetch list of signed firmwares.\n");
+			return res;
+		}
+		uint32_t count = plist_array_get_size(signed_fws);
+		if (count == 0) {
+			plist_free(signed_fws);
+			error("ERROR: No firmwares are currently being signed for %s (REALLY?!)\n", client->device->product_type);
+			return -1;
+		}
+		plist_t selected_fw = NULL;
+		if (client->flags & FLAG_INTERACTIVE) {
+			uint32_t i = 0;
+			info("The following firmwares are currently being signed for %s:\n", client->device->product_type);
+			for (i = 0; i < count; i++) {
+				plist_t fw = plist_array_get_item(signed_fws, i);
+				plist_t p_version = plist_dict_get_item(fw, "version");
+				plist_t p_build = plist_dict_get_item(fw, "buildid");
+				char *s_version = NULL;
+				char *s_build = NULL;
+				plist_get_string_val(p_version, &s_version);
+				plist_get_string_val(p_build, &s_build);
+				info("  [%d] %s (build %s)\n", i+1, s_version, s_build);
+				free(s_version);
+				free(s_build);
+			}
+			while (1) {
+				char input[64];
+				printf("Select the firmware you want to restore: ");
+				fflush(stdout);
+				fflush(stdin);
+				get_user_input(input, 63, 0);
+				unsigned long selected = strtoul(input, NULL, 10);
+				if (selected == 0 || selected > count) {
+					printf("Invalid input value. Must be in range: 1..%d\n", count);
+					continue;
+				}
+				selected_fw = plist_array_get_item(signed_fws, (uint32_t)selected-1);
+				break;
+			}
+		} else {
+			info("NOTE: Running non-interactively, automatically selecting latest available version\n");
+			selected_fw = plist_array_get_item(signed_fws, 0);
+		}
+		if (!selected_fw) {
+			error("ERROR: failed to select latest firmware?!\n");
+			plist_free(signed_fws);
+			return -1;
+		} else {
+			plist_t p_version = plist_dict_get_item(selected_fw, "version");
+			plist_t p_build = plist_dict_get_item(selected_fw, "buildid");
+			char *s_version = NULL;
+			char *s_build = NULL;
+			plist_get_string_val(p_version, &s_version);
+			plist_get_string_val(p_build, &s_build);
+			info("Selected firmware %s (build %s)\n", s_version, s_build);
+			free(s_version);
+			free(s_build);
+			plist_t p_url = plist_dict_get_item(selected_fw, "url");
+			plist_t p_sha1 = plist_dict_get_item(selected_fw, "sha1sum");
+			char *s_sha1 = NULL;
+			plist_get_string_val(p_url, &fwurl);
+			plist_get_string_val(p_sha1, &s_sha1);
+			if (strlen(s_sha1) == 40) {
+				int i;
+				int v;
+				for (i = 0; i < 40; i+=2) {
+					v = 0;
+					sscanf(s_sha1+i, "%02x", &v);
+					fwsha1[i/2] = (unsigned char)v;
+				}
+				p_fwsha1 = &fwsha1[0];
+			} else {
+				error("ERROR: unexpected size of sha1sum\n");
+			}
+		}
+		plist_free(signed_fws);
+
+		if (!fwurl || !p_fwsha1) {
+			error("ERROR: Missing firmware URL or SHA1\n");
+			return -1;
+		}
+
 		char* ipsw = NULL;
-		int res = ipsw_download_latest_fw(client->version_data, client->device->product_type, client->cache_dir, &ipsw);
+		res = ipsw_download_fw(fwurl, p_fwsha1, client->cache_dir, &ipsw);
 		if (res != 0) {
 			if (ipsw) {
 				free(ipsw);
@@ -595,6 +691,14 @@ int idevicerestore_start(struct idevicerestore_client_t* client)
 
 	idevicerestore_progress(client, RESTORE_STEP_PREPARE, 0.0);
 
+	/* check if all components we need are actually there */
+	info("Checking IPSW for required components...\n");
+	if (build_identity_check_components_in_ipsw(build_identity, client->ipsw) < 0) {
+		error("ERROR: Could not find all required components in IPSW %s\n", client->ipsw);
+		return -1;
+	}
+	info("All required components found in IPSW\n");
+
 	// Get filesystem name from build identity
 	char* fsname = NULL;
 	if (build_identity_get_component_path(build_identity, "OS", &fsname) < 0) {
@@ -620,9 +724,17 @@ int idevicerestore_start(struct idevicerestore_client_t* client)
 	} else {
 		strcpy(tmpf, client->ipsw);
 	}
-	char* p = strrchr((const char*)tmpf, '.');
-	if (p) {
-		*p = '\0';
+
+	if (!ipsw_is_directory(client->ipsw)) {
+		// strip off file extension if given ipsw is not a directory
+		char* s = tmpf + strlen(tmpf) - 1;
+		char* p = s;
+		while (*p != '\0' && *p != '.' && *p != '/' && *p != '\\') p--;
+		if (s - p < 6) {
+			if (*p == '.') {
+				*p = '\0';
+			}
+		}
 	}
 
 	if (stat(tmpf, &st) < 0) {
@@ -633,9 +745,9 @@ int idevicerestore_start(struct idevicerestore_client_t* client)
 
 	memset(&st, '\0', sizeof(struct stat));
 	if (stat(tmpf, &st) == 0) {
-		off_t fssize = 0;
+		uint64_t fssize = 0;
 		ipsw_get_file_size(client->ipsw, fsname, &fssize);
-		if ((fssize > 0) && (st.st_size == fssize)) {
+		if ((fssize > 0) && ((uint64_t)st.st_size == fssize)) {
 			info("Using cached filesystem from '%s'\n", tmpf);
 			filesystem = strdup(tmpf);
 		}
@@ -672,7 +784,7 @@ int idevicerestore_start(struct idevicerestore_client_t* client)
 		remove(lockfn);
 
 		// Extract filesystem from IPSW
-		info("Extracting filesystem from IPSW\n");
+		info("Extracting filesystem from IPSW: %s\n", fsname);
 		if (ipsw_extract_to_file_with_progress(client->ipsw, fsname, filesystem, 1) < 0) {
 			error("ERROR: Unable to extract filesystem from IPSW\n");
 			if (client->tss)
@@ -808,7 +920,7 @@ int idevicerestore_start(struct idevicerestore_client_t* client)
 				return -1;
 			}
 			info("exploiting with limera1n\n");
-			// TODO: check for non-limera1n device and fail
+			// TO-DO: check for non-limera1n device and fail
 			if (limera1n_exploit(client->device, &client->dfu->client) != 0) {
 				error("ERROR: limera1n exploit failed\n");
 				dfu_client_free(client);
@@ -851,8 +963,8 @@ int idevicerestore_start(struct idevicerestore_client_t* client)
 		}
 		recovery_client_free(client);
 
-		/* this must be long enough to allow the device to run the iBEC */
-        /* FIXME: Probably better to detect if the device is back then */
+		/* this must be long enough to allow the device to run the iBEC
+           FIXME: Probably better to detect if the device is back then */
 		sleep(7);
 	}
 	idevicerestore_progress(client, RESTORE_STEP_PREPARE, 0.5);
@@ -882,7 +994,7 @@ int idevicerestore_start(struct idevicerestore_client_t* client)
 		}
 
 		if (nonce_changed && !(client->flags & FLAG_CUSTOM)) {
-			// Welcome iOS5. We have to re-request the TSS with our nonce.
+			// Welcome iOS 5. We have to re-request the TSS with our ApNonce.
 			plist_free(client->tss);
             if ((client->flags & FLAG_OTAMANIFEST ? get_tss_response(client, build_identity2, &client->tss) : get_tss_response(client, build_identity, &client->tss)) < 0) {
                 error("ERROR: Unable to get signing tickets for this device\n");
@@ -1094,10 +1206,16 @@ int main(int argc, char* argv[]) {
 		return -1;
 	}
 
-	while ((opt = getopt_long(argc, argv, "dhcesxtplibgo:u:nC:wk", longopts, &optindex)) > 0) {
+	if (!isatty(fileno(stdin)) || !isatty(fileno(stdout))) {
+		client->flags &= ~FLAG_INTERACTIVE;
+	} else {
+		client->flags |= FLAG_INTERACTIVE;
+	}
+
+	while ((opt = getopt_long(argc, argv, "dhcesxtplibgo:u:nC:wky", longopts, &optindex)) > 0) {
 		switch (opt) {
 		case 'h':
-			usage(argc, argv);
+			usage(argc, argv, 0);
 			return 0;
 
 		case 'd':
@@ -1139,6 +1257,11 @@ int main(int argc, char* argv[]) {
 			break;
 
 		case 'u':
+			if (!*optarg) {
+				error("ERROR: UDID must not be empty!\n");
+				usage(argc, argv, 1);
+				return -1;
+			}
 			client->udid = strdup(optarg);
 			break;
 
@@ -1179,8 +1302,12 @@ int main(int argc, char* argv[]) {
             client->flags |= FLAG_PANICLOG;
             break;
 
-        default:
-			usage(argc, argv);
+		case 'y':
+			client->flags &= ~FLAG_INTERACTIVE;
+			break;
+
+		default:
+			usage(argc, argv, 1);
 			return -1;
 		}
 	}
@@ -1191,7 +1318,7 @@ int main(int argc, char* argv[]) {
 
 		ipsw = argv[0];
 	} else {
-		usage(argc, argv);
+		usage(argc, argv, 1);
 		return -1;
 	}
 
@@ -1352,7 +1479,7 @@ int get_ap_nonce(struct idevicerestore_client_t* client, unsigned char** nonce, 
 		}
 		break;
 	case MODE_DFU:
-		info("in dfu mode... ");
+		info("in DFU mode... ");
 		if (dfu_get_ap_nonce(client, nonce, nonce_size) < 0) {
 			info("failed\n");
 			return -1;
@@ -1402,7 +1529,7 @@ int get_sep_nonce(struct idevicerestore_client_t* client, unsigned char** nonce,
 		}
 		break;
 	case MODE_DFU:
-		info("in dfu mode... ");
+		info("in DFU mode... ");
 		if (dfu_get_sep_nonce(client, nonce, nonce_size) < 0) {
 			info("failed\n");
 			return -1;
@@ -1429,28 +1556,6 @@ int get_sep_nonce(struct idevicerestore_client_t* client, unsigned char** nonce,
 	info("\n");
 
 	return 0;
-}
-
-plist_t build_manifest_get_build_identity(plist_t build_manifest, uint32_t identity) {
-	// fetch build identities array from BuildManifest
-	plist_t build_identities_array = plist_dict_get_item(build_manifest, "BuildIdentities");
-	if (!build_identities_array || plist_get_node_type(build_identities_array) != PLIST_ARRAY) {
-		error("ERROR: Unable to find build identities node\n");
-		return NULL;
-	}
-
-	// check and make sure this identity exists in buildmanifest
-	if (identity >= plist_array_get_size(build_identities_array)) {
-		return NULL;
-	}
-
-	plist_t build_identity = plist_array_get_item(build_identities_array, identity);
-	if (!build_identity || plist_get_node_type(build_identity) != PLIST_DICT) {
-		error("ERROR: Unable to find build identities node\n");
-		return NULL;
-	}
-
-	return plist_copy(build_identity);
 }
 
 plist_t build_manifest_get_build_identity_for_model_with_restore_behavior(plist_t build_manifest, const char *hardware_model, const char *behavior)
@@ -1891,6 +1996,40 @@ void build_identity_print_information(plist_t build_identity) {
 
 	info_node = NULL;
 	node = NULL;
+}
+
+int build_identity_check_components_in_ipsw(plist_t build_identity, const char *ipsw)
+{
+	plist_t manifest_node = plist_dict_get_item(build_identity, "Manifest");
+	if (!manifest_node || plist_get_node_type(manifest_node) != PLIST_DICT) {
+		return -1;
+	}
+	int res = 0;
+	plist_dict_iter iter = NULL;
+	plist_dict_new_iter(manifest_node, &iter);
+	plist_t node = NULL;
+	char *key = NULL;
+	do {
+		node = NULL;
+		key = NULL;
+		plist_dict_next_item(manifest_node, iter, &key, &node);
+		if (key && node) {
+			plist_t path = plist_access_path(node, 2, "Info", "Path");
+			if (path) {
+				char *comp_path = NULL;
+				plist_get_string_val(path, &comp_path);
+				if (comp_path) {
+					if (!ipsw_file_exists(ipsw, comp_path)) {
+						error("ERROR: %s file %s not found in IPSW\n", key, comp_path);
+						res = -1;
+					}
+					free(comp_path);
+				}
+			}
+		}
+		free(key);
+	} while (node);
+	return res;
 }
 
 int build_identity_has_component(plist_t build_identity, const char* component) {

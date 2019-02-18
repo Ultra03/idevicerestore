@@ -19,7 +19,6 @@ AM_PROG_CC_C_O
 AC_PROG_LIBTOOL
 
 # Checks for libraries.
-AC_SEARCH_LIBS([pthread_create], [pthread])
 PKG_CHECK_MODULES(libirecovery, libirecovery >= 0.2.0)
 PKG_CHECK_MODULES(libimobiledevice, libimobiledevice-1.0 >= 1.2.1)
 PKG_CHECK_MODULES(libplist, libplist >= 1.0)
@@ -32,21 +31,27 @@ PKG_CHECK_MODULES(zlib, zlib >= 1.2)
 GLOBAL_CFLAGS=""
 AC_LDADD=""
 AC_LDFLAGS=""
-case "$host_os" in
-	darwin*)
-	;;
-	linux*)
-		GLOBAL_CFLAGS+="-lpthread"
-	;;
-	mingw*)
-		GLOBAL_CFLAGS+="-DWIN32 -D__LITTLE_ENDIAN__=1"
-		AC_LDFLAGS+="-static-libgcc -lmsvcr100"
-	;;
-	*)
-	;;
+AC_MSG_CHECKING([whether we need platform-specific build settings])
+case ${host_os} in
+  *mingw32*|*cygwin*)
+    AC_MSG_RESULT([yes])
+    win32=true
+    GLOBAL_CFLAGS+="-DWIN32 -D__LITTLE_ENDIAN__=1"
+    AC_LDFLAGS+="-static-libgcc"
+    ;;
+  darwin*)
+    AC_MSG_RESULT([yes])
+    AC_DEFINE([_DARWIN_BETTER_REALPATH], [1], [Use better method for realpath])
+    AX_PTHREAD([], [AC_MSG_ERROR([pthread is required to build $PACKAGE])])
+    ;;
+  *)
+    AC_MSG_RESULT([yes])
+    AX_PTHREAD([], [AC_MSG_ERROR([pthread is required to build $PACKAGE])])
+    ;;
 esac
+AM_CONDITIONAL(WIN32, test x$win32 = xtrue)
 
-AC_CHECK_FUNCS([strsep strcspn])
+AC_CHECK_FUNCS([strsep strcspn realpath])
 if test x$ac_cv_func_strsep != xyes; then
   if test x$ac_cv_func_strcspn != xyes; then
     AC_MSG_ERROR([You need either strsep or strcspn to build $PACKAGE])

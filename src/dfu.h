@@ -50,9 +50,8 @@ int dfu_get_ap_nonce(struct idevicerestore_client_t* client, unsigned char** non
 int dfu_get_sep_nonce(struct idevicerestore_client_t* client, unsigned char** nonce, int* nonce_size);
 int dfu_enter_recovery(struct idevicerestore_client_t* client, plist_t build_identity);
 
-
 #ifdef __cplusplus
 }
 #endif
 
-#endif
+#endif /* idevicerestore_dfu_h */

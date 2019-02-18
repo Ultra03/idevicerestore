@@ -64,4 +64,4 @@ int restore_send_fdr_trust_data(restored_client_t restore, idevice_t device);
 }
 #endif
 
-#endif
+#endif /* idevicerestore_restore_h */
